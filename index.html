@@ -1,67 +1,31 @@
+}
 <!DOCTYPE html>
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sword Duel Real</title>
+<title>AAA Sword Game</title>
 
 <style>
-body {
-    margin:0;
-    background:#000;
-    color:white;
-    font-family:Arial;
-    text-align:center;
-}
-
-canvas {
-    width:100%;
-    height:60vh;
-}
-
-.bar {
-    width:90%;
-    height:12px;
-    background:#222;
-    margin:5px auto;
-    border-radius:6px;
-    overflow:hidden;
-}
-
-.fill { height:100%; }
-
-#player { background:#00ffcc; }
-#enemy { background:#ff4444; }
-
-#status { margin:10px; font-size:18px; }
-
-button {
-    width:80%;
-    padding:15px;
-    font-size:18px;
-    border:none;
-    border-radius:10px;
-    background:#00ffaa;
-    margin-top:8px;
-}
+body{margin:0;background:#000;color:white;text-align:center;font-family:Arial;}
+canvas{width:100%;height:70vh;touch-action:none;}
+#menu{margin-top:40px;}
+button{padding:15px;width:80%;font-size:18px;border:none;border-radius:10px;background:#00ffaa;}
+#ui{position:absolute;bottom:20px;left:20px;}
+.joy{width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.1);}
 </style>
 </head>
 
 <body>
 
 <div id="menu">
-    <h2>⚔️ Sword Duel Real</h2>
-    <button onclick="startGame()">▶️ START</button>
+<h2>⚔️ AAA Sword Game</h2>
+<button id="startBtn">▶️ START</button>
 </div>
 
-<div id="game" style="display:none;">
-<div id="status">Prepare-se...</div>
+<canvas id="c" style="display:none;"></canvas>
 
-<div class="bar"><div id="enemy" class="fill"></div></div>
-<div class="bar"><div id="player" class="fill"></div></div>
-
-<canvas id="c"></canvas>
-
-<button onclick="attack()">⚔️ ATACAR</button>
+<div id="ui" style="display:none;">
+<div class="joy" id="joy"></div>
 </div>
 
 <script>
@@ -69,78 +33,97 @@ const c=document.getElementById("c");
 const ctx=c.getContext("2d");
 
 c.width=window.innerWidth;
-c.height=320;
+c.height=400;
 
-let state="wait";
-let stamina=100;
-let enemy=100;
-let timer=0;
-let difficulty=700;
+let game=false;
+let camera=0;
+
+let player={
+ x:100,y:260,vx:0,combo:0,attackTimer:0
+};
+
+let enemy={
+ x:600,y:260,hp:100,maxHp:100
+};
+
 let particles=[];
 
-const status=document.getElementById("status");
-const pbar=document.getElementById("player");
-const ebar=document.getElementById("enemy");
+// START
+document.getElementById("startBtn").addEventListener("click",()=>{
+ document.getElementById("menu").style.display="none";
+ document.getElementById("ui").style.display="block";
+ c.style.display="block";
+ game=true;
+});
 
-// 🔊 som simples
-function sound(f){
- let a=new AudioContext();
- let o=a.createOscillator();
- o.frequency.value=f;
- o.connect(a.destination);
- o.start();
- setTimeout(()=>o.stop(),80);
-}
+// JOYSTICK
+let joy=document.getElementById("joy");
+let moving=false, dir=0;
 
-// 🩸 partículas
+joy.addEventListener("touchstart",()=>moving=true);
+joy.addEventListener("touchend",()=>moving=false);
+
+document.addEventListener("touchmove",(e)=>{
+ if(!moving) return;
+ let x=e.touches[0].clientX;
+ dir = x < c.width/2 ? -1 : 1;
+});
+
+// ATAQUE (tap)
+c.addEventListener("touchstart",()=>{
+ player.attackTimer=15;
+ player.combo++;
+ if(player.combo>3) player.combo=1;
+});
+
+// PARTÍCULAS
 function spawn(x,y){
- for(let i=0;i<15;i++){
-  particles.push({
-   x,y,
-   vx:(Math.random()-0.5)*5,
-   vy:(Math.random()-0.5)*5,
-   life:25
-  });
+ for(let i=0;i<20;i++){
+  particles.push({x,y,vx:(Math.random()-0.5)6,vy:(Math.random()-0.5)6,life:25});
  }
 }
 
-// 🎨 desenhar personagem com espada
-function drawFighter(x,isEnemy){
- ctx.fillStyle=isEnemy?"#ff4444":"#00aaff";
-
- // corpo
- ctx.fillRect(x-15,200,30,70);
-
- // cabeça
- ctx.fillStyle="#ffdbac";
- ctx.fillRect(x-12,170,24,24);
-
- // espada
- ctx.strokeStyle="#ccc";
- ctx.lineWidth=3;
- ctx.beginPath();
- ctx.moveTo(x+10,210);
- ctx.lineTo(x+50,180);
- ctx.stroke();
-}
-
-// 🌄 fundo
-function drawBackground(){
- let g=ctx.createLinearGradient(0,0,0,320);
+// DESENHO
+function drawBg(){
+ let g=ctx.createLinearGradient(0,0,0,400);
  g.addColorStop(0,"#1a1a2e");
  g.addColorStop(1,"#16213e");
  ctx.fillStyle=g;
- ctx.fillRect(0,0,c.width,320);
+ ctx.fillRect(0,0,c.width,400);
 
  ctx.fillStyle="#0f3460";
- ctx.fillRect(0,250,c.width,70);
+ ctx.fillRect(0,320,c.width,80);
 }
 
-// partículas
+function drawPlayer(){
+ ctx.fillStyle="#00aaff";
+ ctx.fillRect(player.x-camera,player.y,30,60);
+
+ // espada combo
+ ctx.strokeStyle="#fff";
+ ctx.lineWidth=3;
+ ctx.beginPath();
+
+ let a = player.attackTimer>0 ? Math.sin(player.attackTimer)2 : -0.5;
+
+ ctx.moveTo(player.x-camera+15,player.y+20);
+ ctx.lineTo(player.x-camera+60Math.cos(a),player.y+20+60Math.sin(a));
+ ctx.stroke();
+}
+
+function drawEnemy(){
+ ctx.fillStyle="#ff4444";
+ ctx.fillRect(enemy.x-camera,enemy.y,30,60);
+
+ // barra de vida
+ ctx.fillStyle="red";
+ ctx.fillRect(enemy.x-camera,enemy.y-10,30(enemy.hp/enemy.maxHp),5);
+}
+
 function drawParticles(){
  particles.forEach(p=>{
   ctx.fillStyle="red";
-  ctx.fillRect(p.x,p.y,3,3);
+  ctx.fillRect(p.x-camera,p.y,3,3);
   p.x+=p.vx;
   p.y+=p.vy;
   p.life--;
@@ -148,98 +131,61 @@ function drawParticles(){
  particles=particles.filter(p=>p.life>0);
 }
 
-function draw(){
- drawBackground();
+// IA
+function enemyAI(){
+ let dist=player.x-enemy.x;
 
- drawFighter(80,false);
- drawFighter(c.width-100,true);
-
- drawParticles();
-
- if(state==="attack"){
-  ctx.fillStyle="yellow";
-  ctx.beginPath();
-  ctx.arc(c.width-100,180,20+Math.sin(Date.now()/40)10,0,Math.PI2);
-  ctx.fill();
+ if(Math.abs(dist)>50){
+  enemy.x += dist0.02;
+ }else{
+  if(Math.random()<0.02){
+   spawn(player.x,player.y);
+  }
  }
 }
 
-function update(){
- draw();
-
- if(state==="wait" && Math.random()<0.02){
-  state="attack";
-  timer=Date.now();
-  status.innerText="⚠️ DEFENDA!";
+// HIT
+function hit(){
+ if(player.attackTimer>0 && Math.abs(player.x-enemy.x)<70){
+  enemy.hp-=2player.combo;
+  spawn(enemy.x,enemy.y);
  }
+}
 
- if(state==="attack"){
-  if(Date.now()-timer>difficulty){
-   stamina-=20;
-   pbar.style.width=stamina+"%";
-   status.innerText="💥 VOCÊ FOI ATINGIDO!";
-   sound(100);
-   state="wait";
+// UPDATE
+function update(){
+ ctx.clearRect(0,0,c.width,c.height);
 
-   if(stamina<=0){
-    status.innerText="💀 DERROTA";
-    state="end";
-   }
+ drawBg();
+
+ if(game){
+
+  // movimento
+  player.x += dir*3;
+
+  // câmera segue
+  camera = player.x - c.width/2;
+
+  if(player.attackTimer>0) player.attackTimer--;
+
+  enemyAI();
+  hit();
+
+  drawPlayer();
+  drawEnemy();
+  drawParticles();
+
+  if(enemy.hp<=0){
+   enemy.hp=enemy.maxHp;
+   enemy.x = player.x + 300;
   }
  }
 
  requestAnimationFrame(update);
 }
 
-// ⚔️ ataque (GLOBAL pro iPhone)
-window.attack=function(){
- if(state==="end") return;
-
- if(state==="attack"){
-  let r=Date.now()-timer;
-
-  enemy-=20;
-  ebar.style.width=enemy+"%";
-
-  spawn(c.width-100,180);
-  sound(400);
-
-  if(r<150){
-   status.innerText="⚡ PERFECT "+r+"ms";
-  }else{
-   status.innerText="✔️ HIT "+r+"ms";
-  }
-
-  if(enemy<=0){
-   status.innerText="🏆 VITÓRIA!";
-   state="end";
-  }else{
-   state="wait";
-  }
-
- }else{
-  stamina-=10;
-  pbar.style.width=stamina+"%";
-  status.innerText="❌ ERROU!";
-  sound(80);
-
-  if(stamina<=0){
-   status.innerText="💀 EXAUSTO";
-   state="end";
-  }
- }
-}
-
-// ▶️ start corrigido
-window.startGame=function(){
- document.getElementById("menu").style.display="none";
- document.getElementById("game").style.display="block";
-}
-
-// toque na tela inteira
-c.addEventListener("touchstart",()=>attack());
-
 update();
 </script>
 
 </body>
+</ht
