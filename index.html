@@ -352,5 +352,205 @@ createButton("KICK", UDim2.new(0.45,0,0.8,0), function()
 end)
 
 createButton("BLOCK", UDim2.new(0.7,0,0.8,0), function()
+local ANIMS = {
+	Punch = "rbxassetid://0",
+	Kick = "rbxassetid://0",
+	Block = "rbxassetid://0",
+	Dodge = "rbxassetid://0"
+}
 	print("BLOCK (vamos conectar depois)")
 end)
+Ia inimiga lutando com animação, efeitos aaa e sistema de esquiva e parry 
+local UIS = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local attackEvent = ReplicatedStorage:WaitForChild("AttackEvent")
+local blockEvent = ReplicatedStorage:WaitForChild("BlockEvent")
+local dodgeEvent = ReplicatedStorage:WaitForChild("DodgeEvent")
+
+local canAttack = true
+local blocking = false
+
+-- ATTACK
+local function attack()
+	if not canAttack then return end
+	canAttack = false
+
+	attackEvent:FireServer()
+
+	task.wait(0.4)
+	canAttack = true
+end
+
+-- BLOCK (PARRY SYSTEM)
+local function blockStart()
+	blocking = true
+	blockEvent:FireServer(true)
+end
+
+local function blockEnd()
+	blocking = false
+	blockEvent:FireServer(false)
+end
+
+-- DODGE
+local function dodge()
+	dodgeEvent:FireServer()
+end
+
+UIS.InputBegan:Connect(function(input, gpe)
+	if gpe then return end
+
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		attack()
+	end
+
+	if input.KeyCode == Enum.KeyCode.F then
+		blockStart()
+	end
+
+	if input.KeyCode == Enum.KeyCode.Space then
+		dodge()
+	end
+end)
+
+UIS.InputEnded:Connect(function(input)
+	if input.KeyCode == Enum.KeyCode.F then
+		blockEnd()
+	end
+end)
+local Players = game:GetService("Players")
+
+local function getClosestEnemy(char)
+	local root = char:FindFirstChild("HumanoidRootPart")
+	if not root then return end
+
+	local closest, dist = nil, 999
+
+	for _, p in pairs(Players:GetPlayers()) do
+		if p.Character and p.Character ~= char then
+			local r = p.Character:FindFirstChild("HumanoidRootPart")
+			if r then
+				local d = (root.Position - r.Position).Magnitude
+				if d < dist then
+					dist = d
+					closest = p.Character
+				end
+			end
+		end
+	end
+
+	return closest, dist
+end
+
+while task.wait(0.2) do
+	for _, enemyChar in pairs(workspace:GetChildren()) do
+		if enemyChar:FindFirstChild("Humanoid") and enemyChar:FindFirstChild("AI") then
+
+			local target, dist = getClosestEnemy(enemyChar)
+			if not target then continue end
+
+			local eRoot = enemyChar.HumanoidRootPart
+			local tRoot = target.HumanoidRootPart
+			local hum = enemyChar.Humanoid
+
+			-- mover até o player
+			if dist > 5 then
+				hum:MoveTo(tRoot.Position)
+			else
+				-- atacar
+				if math.random() < 0.4 then
+					enemyChar:SetAttribute("Attacking", true)
+
+					local targetHum = target:FindFirstChild("Humanoid")
+
+					if targetHum then
+						targetHum:TakeDamage(8)
+					end
+
+					task.wait(0.5)
+					enemyChar:SetAttribute("Attacking", false)
+				end
+			end
+		end
+	end
+end
+					local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local attackEvent = ReplicatedStorage:WaitForChild("AttackEvent")
+local blockEvent = ReplicatedStorage:WaitForChild("BlockEvent")
+local dodgeEvent = ReplicatedStorage:WaitForChild("DodgeEvent")
+
+local blocking = {}
+local dodging = {}
+
+-- BLOCK
+blockEvent.OnServerEvent:Connect(function(player, state)
+	blocking[player] = state
+end)
+
+-- DODGE (invencibilidade curta)
+dodgeEvent.OnServerEvent:Connect(function(player)
+	dodging[player] = true
+
+	task.delay(0.3, function()
+		dodging[player] = false
+	end)
+end)
+
+-- ATTACK
+attackEvent.OnServerEvent:Connect(function(player)
+
+	local char = player.Character
+	if not char then return end
+
+	local root = char:FindFirstChild("HumanoidRootPart")
+	if not root then return end
+
+	for _, target in pairs(game.Players:GetPlayers()) do
+
+		if target ~= player and target.Character then
+
+			local tChar = target.Character
+			local tRoot = tChar:FindFirstChild("HumanoidRootPart")
+			local hum = tChar:FindFirstChild("Humanoid")
+
+			if tRoot and hum then
+
+				local dist = (root.Position - tRoot.Position).Magnitude
+
+				if dist < 5 then
+
+					-- 🧠 DODGE = invencível
+					if dodging[target] then
+						return
+					end
+
+					-- 🛡 PARry SYSTEM
+					if blocking[target] then
+						-- PARRY: reduz dano e empurra atacante
+						hum:TakeDamage(2)
+
+						root.Velocity = (root.Position - tRoot.Position).Unit * 30
+
+					else
+						hum:TakeDamage(10)
+
+						tRoot.Velocity = (tRoot.Position - root.Position).Unit * 40
+					end
+				end
+			end
+		end
+	end
+end)
+					
+local Lighting = game:GetService("Lighting")
+
+game.ReplicatedStorage.AttackEvent.OnClientEvent:Connect(function()
+
+	-- flash hit
+	Lighting.Brightness = 5
+	task.wait(0.05)
+	Lighting.Brightness = 2
+end)
+					
