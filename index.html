@@ -2,11 +2,11 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AAA Sword Game AUTO</title>
+<title>AAA Sword Game FIX</title>
 
 <style>
-body{margin:0;background:#000;}
-canvas{width:100%;height:70vh;touch-action:none;}
+body { margin:0; background:#000; overflow:hidden; }
+canvas { width:100%; height:70vh; touch-action:none; display:block; }
 </style>
 </head>
 
@@ -15,131 +15,177 @@ canvas{width:100%;height:70vh;touch-action:none;}
 <canvas id="c"></canvas>
 
 <script>
-const c=document.getElementById("c");
-const ctx=c.getContext("2d");
+const c = document.getElementById("c");
+const ctx = c.getContext("2d");
 
-c.width=window.innerWidth;
-c.height=400;
+c.width = window.innerWidth;
+c.height = 400;
 
-let camera=0;
+// =====================
+// CAMERA
+// =====================
+let camera = 0;
 
-let player={
- x:100,y:260,combo:0,attackTimer:0
+// =====================
+// PLAYER
+// =====================
+let player = {
+ x: 100,
+ y: 260,
+ combo: 0,
+ attackTimer: 0
 };
 
-let enemy={
- x:600,y:260,hp:100,maxHp:100
+// =====================
+// ENEMY
+// =====================
+let enemy = {
+ x: 600,
+ y: 260,
+ hp: 100,
+ maxHp: 100
 };
 
-let particles=[];
-let dir=0;
+// =====================
+// PARTICLES
+// =====================
+let particles = [];
+let dir = 0;
 
-// 🎮 MOVIMENTO (arrastar)
-document.addEventListener("touchmove",(e)=>{
- let x=e.touches[0].clientX;
- dir = x < c.width/2 ? -1 : 1;
+// =====================
+// TOUCH CONTROLS
+// =====================
+document.addEventListener("touchmove", (e) => {
+ let x = e.touches[0].clientX;
+ dir = x < c.width / 2 ? -1 : 1;
 });
 
-// parar
-document.addEventListener("touchend",()=>dir=0);
+document.addEventListener("touchend", () => dir = 0);
 
-// ⚔️ ATAQUE (toque)
-c.addEventListener("touchstart",()=>{
- player.attackTimer=15;
+c.addEventListener("touchstart", () => {
+ player.attackTimer = 15;
  player.combo++;
- if(player.combo>3) player.combo=1;
+ if (player.combo > 3) player.combo = 1;
 });
 
-// 🩸 partículas
-function spawn(x,y){
- for(let i=0;i<20;i++){
-  particles.push({x,y,vx:(Math.random()-0.5)6,vy:(Math.random()-0.5)6,life:25});
+// =====================
+// PARTICLE FX
+// =====================
+function spawn(x, y) {
+ for (let i = 0; i < 20; i++) {
+  particles.push({
+   x,
+   y,
+   vx: (Math.random() - 0.5) * 6,
+   vy: (Math.random() - 0.5) * 6,
+   life: 25
+  });
  }
 }
 
-// 🌄 fundo
-function drawBg(){
- let g=ctx.createLinearGradient(0,0,0,400);
- g.addColorStop(0,"#1a1a2e");
- g.addColorStop(1,"#16213e");
- ctx.fillStyle=g;
- ctx.fillRect(0,0,c.width,400);
+// =====================
+// BACKGROUND
+// =====================
+function drawBg() {
+ let g = ctx.createLinearGradient(0, 0, 0, 400);
+ g.addColorStop(0, "#1a1a2e");
+ g.addColorStop(1, "#16213e");
 
- ctx.fillStyle="#0f3460";
- ctx.fillRect(0,320,c.width,80);
+ ctx.fillStyle = g;
+ ctx.fillRect(0, 0, c.width, 400);
+
+ ctx.fillStyle = "#0f3460";
+ ctx.fillRect(0, 320, c.width, 80);
 }
 
-// 🧍 player
-function drawPlayer(){
- ctx.fillStyle="#00aaff";
- ctx.fillRect(player.x-camera,player.y,30,60);
+// =====================
+// PLAYER
+// =====================
+function drawPlayer() {
+ ctx.fillStyle = "#00aaff";
+ ctx.fillRect(player.x - camera, player.y, 30, 60);
 
- ctx.strokeStyle="#fff";
- ctx.lineWidth=3;
+ ctx.strokeStyle = "#fff";
+ ctx.lineWidth = 3;
+
+ let a = player.attackTimer > 0 ? Math.sin(player.attackTimer) * 2 : -0.5;
+
  ctx.beginPath();
-
- let a = player.attackTimer>0 ? Math.sin(player.attackTimer)2 : -0.5;
-
- ctx.moveTo(player.x-camera+15,player.y+20);
- ctx.lineTo(player.x-camera+60Math.cos(a),player.y+20+60Math.sin(a));
+ ctx.moveTo(player.x - camera + 15, player.y + 20);
+ ctx.lineTo(
+  player.x - camera + 60 * Math.cos(a),
+  player.y + 20 + 60 * Math.sin(a)
+ );
  ctx.stroke();
 }
 
-// 👹 enemy
-function drawEnemy(){
- ctx.fillStyle="#ff4444";
- ctx.fillRect(enemy.x-camera,enemy.y,30,60);
+// =====================
+// ENEMY
+// =====================
+function drawEnemy() {
+ ctx.fillStyle = "#ff4444";
+ ctx.fillRect(enemy.x - camera, enemy.y, 30, 60);
 
- ctx.fillStyle="red";
- ctx.fillRect(enemy.x-camera,enemy.y-10,30(enemy.hp/enemy.maxHp),5);
+ ctx.fillStyle = "red";
+ ctx.fillRect(enemy.x - camera, enemy.y - 10, 30 * (enemy.hp / enemy.maxHp), 5);
 }
 
-// partículas
-function drawParticles(){
- particles.forEach(p=>{
-  ctx.fillStyle="red";
-  ctx.fillRect(p.x-camera,p.y,3,3);
-  p.x+=p.vx;
-  p.y+=p.vy;
+// =====================
+// PARTICLES
+// =====================
+function drawParticles() {
+ particles.forEach(p => {
+  ctx.fillStyle = "red";
+  ctx.fillRect(p.x - camera, p.y, 3, 3);
+
+  p.x += p.vx;
+  p.y += p.vy;
   p.life--;
  });
- particles=particles.filter(p=>p.life>0);
+
+ particles = particles.filter(p => p.life > 0);
 }
 
-// IA
-function enemyAI(){
- let dist=player.x-enemy.x;
+// =====================
+// ENEMY AI
+// =====================
+function enemyAI() {
+ let dist = player.x - enemy.x;
 
- if(Math.abs(dist)>50){
-  enemy.x += dist0.02;
- }else{
-  if(Math.random()<0.02){
-   spawn(player.x,player.y);
+ if (Math.abs(dist) > 50) {
+  enemy.x += dist * 0.02;
+ } else {
+  if (Math.random() < 0.02) {
+   spawn(player.x, player.y);
   }
  }
 }
 
-// HIT
-function hit(){
- if(player.attackTimer>0 && Math.abs(player.x-enemy.x)<70){
-  enemy.hp-=2player.combo;
-  spawn(enemy.x,enemy.y);
+// =====================
+// HIT SYSTEM
+// =====================
+function hit() {
+ if (player.attackTimer > 0 && Math.abs(player.x - enemy.x) < 70) {
+  enemy.hp -= 2 * player.combo;
+  spawn(enemy.x, enemy.y);
  }
 }
 
-// UPDATE
-function update(){
- ctx.clearRect(0,0,c.width,c.height);
+// =====================
+// LOOP
+// =====================
+function update() {
+ ctx.clearRect(0, 0, c.width, c.height);
 
  drawBg();
 
- player.x += dir*4;
+ player.x += dir * 4;
 
- if(player.x<0) player.x=0;
+ if (player.x < 0) player.x = 0;
 
- camera = player.x - c.width/2;
+ camera = player.x - c.width / 2;
 
- if(player.attackTimer>0) player.attackTimer--;
+ if (player.attackTimer > 0) player.attackTimer--;
 
  enemyAI();
  hit();
@@ -148,8 +194,8 @@ function update(){
  drawEnemy();
  drawParticles();
 
- if(enemy.hp<=0){
-  enemy.hp=enemy.maxHp;
+ if (enemy.hp <= 0) {
+  enemy.hp = enemy.maxHp;
   enemy.x = player.x + 300;
  }
 
