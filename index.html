@@ -245,7 +245,9 @@ function startGame(){
  document.getElementById("game").style.display="block";
 }
 
-update();
+window.onload = () => {
+    update();
+};
 </script>
 
 </body>
