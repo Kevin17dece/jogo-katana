@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
 <meta charset="UTF-8">
-<title>AAA 3D World Base</title>
+<title>Shadow Fight 3D Base</title>
 
 <style>
 body { margin:0; overflow:hidden; background:#000; }
@@ -15,149 +15,177 @@ canvas { display:block; }
 <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
 
 <script>
-// ============================
-// SETUP BÁSICO 3D
-// ============================
+// =======================
+// SETUP
+// =======================
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x87ceeb, 20, 120);
+scene.fog = new THREE.Fog(0x000000, 10, 60);
 
 const camera = new THREE.PerspectiveCamera(
-  75,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  1000
+  75, window.innerWidth/window.innerHeight, 0.1, 1000
 );
 
 const renderer = new THREE.WebGLRenderer({ antialias:true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// ============================
-// LUZ
-// ============================
-const light = new THREE.DirectionalLight(0xffffff, 1.2);
-light.position.set(10,20,10);
+// =======================
+// LUZ (DRAMÁTICA SHADOW)
+// =======================
+const light = new THREE.DirectionalLight(0xffffff, 1.5);
+light.position.set(5,10,5);
 scene.add(light);
 
-const ambient = new THREE.AmbientLight(0xffffff, 0.4);
-scene.add(ambient);
+scene.add(new THREE.AmbientLight(0x222222));
 
-// ============================
-// MUNDO ABERTO (TERRENO)
-// ============================
+// =======================
+// CHÃO
+// =======================
 const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(500, 500),
-  new THREE.MeshStandardMaterial({ color: 0x228B22 })
+  new THREE.PlaneGeometry(200,200),
+  new THREE.MeshStandardMaterial({ color:0x111111 })
 );
-ground.rotation.x = -Math.PI / 2;
+ground.rotation.x = -Math.PI/2;
 scene.add(ground);
 
-// ============================
-// PLAYER (PLACEHOLDER 3D)
-// ============================
-const player = new THREE.Mesh(
-  new THREE.BoxGeometry(1,2,1),
-  new THREE.MeshStandardMaterial({ color: 0x00aaff })
-);
+// =======================
+// FUNÇÃO SHADOW CHARACTER
+// =======================
+function createShadowFighter(color=0x000000){
+  const group = new THREE.Group();
+
+  const body = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.5,1.2,4,8),
+    new THREE.MeshStandardMaterial({ color:color })
+  );
+
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.4,16,16),
+    new THREE.MeshStandardMaterial({ color:color })
+  );
+  head.position.y = 1.5;
+
+  group.add(body);
+  group.add(head);
+
+  group.userData = {
+    velocity:0,
+    attacking:false,
+    attackTimer:0
+  };
+
+  return group;
+}
+
+// =======================
+// PLAYER & ENEMY
+// =======================
+const player = createShadowFighter(0x000000);
 player.position.y = 1;
 scene.add(player);
 
-// ============================
-// ENEMY
-// ============================
-const enemy = new THREE.Mesh(
-  new THREE.BoxGeometry(1,2,1),
-  new THREE.MeshStandardMaterial({ color: 0xff3333 })
-);
-enemy.position.set(5,1,5);
+const enemy = createShadowFighter(0x111111);
+enemy.position.set(3,1,0);
 scene.add(enemy);
 
-// ============================
+// =======================
 // CONTROLES
-// ============================
+// =======================
 const keys = {};
-document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
-document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+document.addEventListener("keydown", e=>keys[e.key.toLowerCase()]=true);
+document.addEventListener("keyup", e=>keys[e.key.toLowerCase()]=false);
 
-// ============================
-// CÂMERA 360 (DRAG)
-// ============================
-let isDragging = false;
-let rotY = 0;
-let rotX = 0;
+// =======================
+// CÂMERA 360
+// =======================
+let rotY=0, rotX=0;
+let drag=false;
 
-document.addEventListener("mousedown", ()=>isDragging=true);
-document.addEventListener("mouseup", ()=>isDragging=false);
+document.addEventListener("mousedown",()=>drag=true);
+document.addEventListener("mouseup",()=>drag=false);
 
-document.addEventListener("mousemove", (e)=>{
- if(isDragging){
-  rotY -= e.movementX * 0.005;
-  rotX -= e.movementY * 0.005;
-  rotX = Math.max(-1.2, Math.min(1.2, rotX));
+document.addEventListener("mousemove",(e)=>{
+ if(drag){
+  rotY -= e.movementX*0.005;
+  rotX -= e.movementY*0.005;
+  rotX=Math.max(-1,Math.min(1,rotX));
  }
 });
 
-// mobile touch
-let lastX=0, lastY=0;
+// =======================
+// ATAQUE + HITBOX
+// =======================
+function attack(attacker, target){
+ let dist = attacker.position.distanceTo(target.position);
 
-document.addEventListener("touchmove",(e)=>{
- let t = e.touches[0];
- if(lastX){
-  rotY -= (t.clientX - lastX)*0.005;
-  rotX -= (t.clientY - lastY)*0.005;
-  rotX = Math.max(-1.2, Math.min(1.2, rotX));
+ if(dist < 1.8){
+  target.userData.hit = true;
  }
- lastX = t.clientX;
- lastY = t.clientY;
+}
+
+document.addEventListener("click",()=>{
+ player.userData.attacking = true;
+ player.userData.attackTimer = 10;
+
+ attack(player, enemy);
 });
 
-// ============================
+// =======================
+// IA INIMIGO
+// =======================
+function enemyAI(){
+ let dist = player.position.x - enemy.position.x;
+
+ enemy.position.x += dist * 0.02;
+
+ if(Math.abs(dist)<1.5 && Math.random()<0.02){
+  attack(enemy, player);
+ }
+}
+
+// =======================
 // LOOP
-// ============================
+// =======================
 function animate(){
  requestAnimationFrame(animate);
 
- // movimento relativo à câmera
- let speed = 0.15;
+ // MOVIMENTO PLAYER
+ let speed=0.05;
 
- let forward = new THREE.Vector3(
-  Math.sin(rotY),
-  0,
-  Math.cos(rotY)
- );
+ if(keys["w"]) player.position.z -= speed;
+ if(keys["s"]) player.position.z += speed;
+ if(keys["a"]) player.position.x -= speed;
+ if(keys["d"]) player.position.x += speed;
 
- let right = new THREE.Vector3(
-  Math.cos(rotY),
-  0,
-  -Math.sin(rotY)
- );
+ // ANIMAÇÃO SIMPLES (idle/attack)
+ if(player.userData.attackTimer>0){
+  player.rotation.z = Math.sin(player.userData.attackTimer)*0.5;
+  player.userData.attackTimer--;
+ }else{
+  player.rotation.z = 0;
+ }
 
- if(keys["w"]) player.position.addScaledVector(forward, speed);
- if(keys["s"]) player.position.addScaledVector(forward, -speed);
- if(keys["a"]) player.position.addScaledVector(right, -speed);
- if(keys["d"]) player.position.addScaledVector(right, speed);
+ // INIMIGO
+ enemyAI();
 
- // câmera 3ª pessoa livre
+ // CÂMERA 3ª PESSOA
  let camOffset = new THREE.Vector3(
   Math.sin(rotY)*5,
-  3 + rotX*2,
+  2 + rotX*2,
   Math.cos(rotY)*5
  );
 
  camera.position.copy(player.position).add(camOffset);
  camera.lookAt(player.position);
 
- // inimigo simples
- enemy.position.x += Math.sin(Date.now()*0.001)*0.01;
-
  renderer.render(scene,camera);
 }
 
 animate();
 
-// resize
+// RESIZE
 window.addEventListener("resize",()=>{
- camera.aspect = window.innerWidth/window.innerHeight;
+ camera.aspect=window.innerWidth/window.innerHeight;
  camera.updateProjectionMatrix();
  renderer.setSize(window.innerWidth,window.innerHeight);
 });
