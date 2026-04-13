@@ -2,29 +2,17 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AAA Sword Game FINAL</title>
+<title>AAA Sword Game AUTO</title>
 
 <style>
-body{margin:0;background:#000;color:white;text-align:center;font-family:Arial;}
+body{margin:0;background:#000;}
 canvas{width:100%;height:70vh;touch-action:none;}
-#menu{margin-top:40px;}
-#ui{position:absolute;bottom:20px;left:20px;display:none;}
-.joy{width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.1);}
 </style>
 </head>
 
 <body>
 
-<div id="menu">
-<h2>⚔️ AAA Sword Game</h2>
-<p>👉 Toque na tela para começar</p>
-</div>
-
-<canvas id="c" style="display:none;"></canvas>
-
-<div id="ui">
-<div class="joy"></div>
-</div>
+<canvas id="c"></canvas>
 
 <script>
 const c=document.getElementById("c");
@@ -33,7 +21,6 @@ const ctx=c.getContext("2d");
 c.width=window.innerWidth;
 c.height=400;
 
-let game=false;
 let camera=0;
 
 let player={
@@ -47,27 +34,16 @@ let enemy={
 let particles=[];
 let dir=0;
 
-// 👉 START AUTOMÁTICO (FIX FINAL)
-document.addEventListener("touchstart", startGame, {once:true});
-document.addEventListener("click", startGame, {once:true});
-
-function startGame(){
- document.getElementById("menu").style.display="none";
- document.getElementById("ui").style.display="block";
- c.style.display="block";
- game=true;
-}
-
-// 🎮 MOVIMENTO
+// 🎮 MOVIMENTO (arrastar)
 document.addEventListener("touchmove",(e)=>{
  let x=e.touches[0].clientX;
  dir = x < c.width/2 ? -1 : 1;
 });
 
-// parar movimento
+// parar
 document.addEventListener("touchend",()=>dir=0);
 
-// ⚔️ ATAQUE
+// ⚔️ ATAQUE (toque)
 c.addEventListener("touchstart",()=>{
  player.attackTimer=15;
  player.combo++;
@@ -81,7 +57,7 @@ function spawn(x,y){
  }
 }
 
-// 🌄 FUNDO
+// 🌄 fundo
 function drawBg(){
  let g=ctx.createLinearGradient(0,0,0,400);
  g.addColorStop(0,"#1a1a2e");
@@ -93,7 +69,7 @@ function drawBg(){
  ctx.fillRect(0,320,c.width,80);
 }
 
-// 🧍 PLAYER
+// 🧍 player
 function drawPlayer(){
  ctx.fillStyle="#00aaff";
  ctx.fillRect(player.x-camera,player.y,30,60);
@@ -109,7 +85,7 @@ function drawPlayer(){
  ctx.stroke();
 }
 
-// 👹 ENEMY
+// 👹 enemy
 function drawEnemy(){
  ctx.fillStyle="#ff4444";
  ctx.fillRect(enemy.x-camera,enemy.y,30,60);
@@ -118,7 +94,7 @@ function drawEnemy(){
  ctx.fillRect(enemy.x-camera,enemy.y-10,30(enemy.hp/enemy.maxHp),5);
 }
 
-// ✨ partículas
+// partículas
 function drawParticles(){
  particles.forEach(p=>{
   ctx.fillStyle="red";
@@ -130,7 +106,7 @@ function drawParticles(){
  particles=particles.filter(p=>p.life>0);
 }
 
-// 🧠 IA
+// IA
 function enemyAI(){
  let dist=player.x-enemy.x;
 
@@ -143,7 +119,7 @@ function enemyAI(){
  }
 }
 
-// ⚔️ HIT
+// HIT
 function hit(){
  if(player.attackTimer>0 && Math.abs(player.x-enemy.x)<70){
   enemy.hp-=2player.combo;
@@ -151,35 +127,30 @@ function hit(){
  }
 }
 
-// 🔄 UPDATE
+// UPDATE
 function update(){
  ctx.clearRect(0,0,c.width,c.height);
 
  drawBg();
 
- if(game){
+ player.x += dir*4;
 
-  player.x += dir*4;
+ if(player.x<0) player.x=0;
 
-  // limites
-  if(player.x<0) player.x=0;
+ camera = player.x - c.width/2;
 
-  // câmera segue
-  camera = player.x - c.width/2;
+ if(player.attackTimer>0) player.attackTimer--;
 
-  if(player.attackTimer>0) player.attackTimer--;
+ enemyAI();
+ hit();
 
-  enemyAI();
-  hit();
+ drawPlayer();
+ drawEnemy();
+ drawParticles();
 
-  drawPlayer();
-  drawEnemy();
-  drawParticles();
-
-  if(enemy.hp<=0){
-   enemy.hp=enemy.maxHp;
-   enemy.x = player.x + 300;
-  }
+ if(enemy.hp<=0){
+  enemy.hp=enemy.maxHp;
+  enemy.x = player.x + 300;
  }
 
  requestAnimationFrame(update);
@@ -189,4 +160,4 @@ update();
 </script>
 
 </body>
-</htm
+</html>
