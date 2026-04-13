@@ -2,10 +2,10 @@
 <html lang="pt-br">
 <head>
 <meta charset="UTF-8">
-<title>Shadow Fight 3D Base</title>
+<title>AAA Shadow Fight Anim Base</title>
 
 <style>
-body { margin:0; overflow:hidden; background:#000; }
+body { margin:0; overflow:hidden; background:black; }
 canvas { display:block; }
 </style>
 </head>
@@ -13,182 +13,141 @@ canvas { display:block; }
 <body>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/examples/js/loaders/GLTFLoader.js"></script>
 
 <script>
-// =======================
-// SETUP
-// =======================
+
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x000000, 10, 60);
+scene.fog = new THREE.Fog(0x000000, 5, 60);
 
-const camera = new THREE.PerspectiveCamera(
-  75, window.innerWidth/window.innerHeight, 0.1, 1000
-);
-
+const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias:true });
-renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// =======================
-// LUZ (DRAMÁTICA SHADOW)
-// =======================
+// luz
+scene.add(new THREE.AmbientLight(0x333333));
 const light = new THREE.DirectionalLight(0xffffff, 1.5);
 light.position.set(5,10,5);
 scene.add(light);
 
-scene.add(new THREE.AmbientLight(0x222222));
-
-// =======================
-// CHÃO
-// =======================
+// chão
 const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(200,200),
-  new THREE.MeshStandardMaterial({ color:0x111111 })
+ new THREE.PlaneGeometry(200,200),
+ new THREE.MeshStandardMaterial({ color:0x111111 })
 );
 ground.rotation.x = -Math.PI/2;
 scene.add(ground);
 
-// =======================
-// FUNÇÃO SHADOW CHARACTER
-// =======================
-function createShadowFighter(color=0x000000){
-  const group = new THREE.Group();
+// =========================
+// INPUT
+// =========================
+const keys = {};
+document.addEventListener("keydown",e=>keys[e.key.toLowerCase()]=true);
+document.addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
 
-  const body = new THREE.Mesh(
-    new THREE.CapsuleGeometry(0.5,1.2,4,8),
-    new THREE.MeshStandardMaterial({ color:color })
-  );
+// =========================
+// LOADER
+// =========================
+const loader = new THREE.GLTFLoader();
 
-  const head = new THREE.Mesh(
-    new THREE.SphereGeometry(0.4,16,16),
-    new THREE.MeshStandardMaterial({ color:color })
-  );
-  head.position.y = 1.5;
+let player, enemy;
+let playerMixer, enemyMixer;
 
-  group.add(body);
-  group.add(head);
+function loadFighter(url, x, colorShift=0x000000){
 
-  group.userData = {
-    velocity:0,
-    attacking:false,
-    attackTimer:0
-  };
+ loader.load(url,(gltf)=>{
 
-  return group;
+  const model = gltf.scene;
+  model.scale.set(1,1,1);
+  model.position.set(x,0,0);
+
+  scene.add(model);
+
+  const mixer = new THREE.AnimationMixer(model);
+
+  let idle = gltf.animations[0]; // primeira animação (idle geralmente)
+
+  let action = mixer.clipAction(idle);
+  action.play();
+
+  if(x===0){
+   player = model;
+   playerMixer = mixer;
+  } else {
+   enemy = model;
+   enemyMixer = mixer;
+  }
+
+ });
 }
 
-// =======================
-// PLAYER & ENEMY
-// =======================
-const player = createShadowFighter(0x000000);
-player.position.y = 1;
-scene.add(player);
+// modelo humano simples (padrão online)
+loadFighter("https://threejs.org/examples/models/gltf/Soldier.glb", 0);
+loadFighter("https://threejs.org/examples/models/gltf/Soldier.glb", 2);
 
-const enemy = createShadowFighter(0x111111);
-enemy.position.set(3,1,0);
-scene.add(enemy);
+// =========================
+// COMBATE AAA CORE
+// =========================
+function hitCheck(){
 
-// =======================
-// CONTROLES
-// =======================
-const keys = {};
-document.addEventListener("keydown", e=>keys[e.key.toLowerCase()]=true);
-document.addEventListener("keyup", e=>keys[e.key.toLowerCase()]=false);
+ if(!player || !enemy) return;
 
-// =======================
-// CÂMERA 360
-// =======================
-let rotY=0, rotX=0;
-let drag=false;
+ let dist = player.position.distanceTo(enemy.position);
 
-document.addEventListener("mousedown",()=>drag=true);
-document.addEventListener("mouseup",()=>drag=false);
-
-document.addEventListener("mousemove",(e)=>{
- if(drag){
-  rotY -= e.movementX*0.005;
-  rotX -= e.movementY*0.005;
-  rotX=Math.max(-1,Math.min(1,rotX));
- }
-});
-
-// =======================
-// ATAQUE + HITBOX
-// =======================
-function attack(attacker, target){
- let dist = attacker.position.distanceTo(target.position);
-
- if(dist < 1.8){
-  target.userData.hit = true;
+ if(dist < 1.5){
+  enemy.position.x += 0.2; // knockback simples
  }
 }
 
 document.addEventListener("click",()=>{
- player.userData.attacking = true;
- player.userData.attackTimer = 10;
-
- attack(player, enemy);
+ hitCheck();
 });
 
-// =======================
-// IA INIMIGO
-// =======================
-function enemyAI(){
- let dist = player.position.x - enemy.position.x;
-
- enemy.position.x += dist * 0.02;
-
- if(Math.abs(dist)<1.5 && Math.random()<0.02){
-  attack(enemy, player);
- }
-}
-
-// =======================
+// =========================
 // LOOP
-// =======================
+// =========================
 function animate(){
  requestAnimationFrame(animate);
 
- // MOVIMENTO PLAYER
- let speed=0.05;
+ let speed = 0.05;
 
- if(keys["w"]) player.position.z -= speed;
- if(keys["s"]) player.position.z += speed;
- if(keys["a"]) player.position.x -= speed;
- if(keys["d"]) player.position.x += speed;
-
- // ANIMAÇÃO SIMPLES (idle/attack)
- if(player.userData.attackTimer>0){
-  player.rotation.z = Math.sin(player.userData.attackTimer)*0.5;
-  player.userData.attackTimer--;
- }else{
-  player.rotation.z = 0;
+ if(player){
+  if(keys["w"]) player.position.z -= speed;
+  if(keys["s"]) player.position.z += speed;
+  if(keys["a"]) player.position.x -= speed;
+  if(keys["d"]) player.position.x += speed;
  }
 
- // INIMIGO
- enemyAI();
+ if(playerMixer) playerMixer.update(0.016);
+ if(enemyMixer) enemyMixer.update(0.016);
 
- // CÂMERA 3ª PESSOA
- let camOffset = new THREE.Vector3(
-  Math.sin(rotY)*5,
-  2 + rotX*2,
-  Math.cos(rotY)*5
- );
+ // IA simples
+ if(player && enemy){
+  enemy.position.x += (player.position.x - enemy.position.x) * 0.01;
+ }
 
- camera.position.copy(player.position).add(camOffset);
- camera.lookAt(player.position);
+ // câmera luta
+ if(player){
+  camera.position.set(
+   player.position.x,
+   player.position.y + 2,
+   player.position.z + 5
+  );
+  camera.lookAt(player.position);
+ }
 
  renderer.render(scene,camera);
 }
 
 animate();
 
-// RESIZE
 window.addEventListener("resize",()=>{
- camera.aspect=window.innerWidth/window.innerHeight;
+ camera.aspect = innerWidth/innerHeight;
  camera.updateProjectionMatrix();
- renderer.setSize(window.innerWidth,window.innerHeight);
+ renderer.setSize(innerWidth,innerHeight);
 });
+
 </script>
 
 </body>
