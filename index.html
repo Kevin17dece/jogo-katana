@@ -258,3 +258,99 @@ loop();
 
 </body>
 </html>
+local player = game.Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
+camera.CameraType = Enum.CameraType.Scriptable
+
+local runService = game:GetService("RunService")
+
+runService.RenderStepped:Connect(function()
+	local char = player.Character
+	if not char then return end
+
+	local root = char:FindFirstChild("HumanoidRootPart")
+	if not root then return end
+
+	local targetPos = root.Position + Vector3.new(0, 3, 8)
+
+	camera.CFrame = CFrame.new(targetPos, root.Position + Vector3.new(0,2,0))
+end)
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local attackEvent = ReplicatedStorage:WaitForChild("AttackEvent")
+
+local player = game.Players.LocalPlayer
+
+-- ⚠️ coloque seus IDs depois
+local punchAnimId = "rbxassetid://0"
+local kickAnimId = "rbxassetid://0"
+
+local function playAnim(animId)
+	local char = player.Character
+	if not char then return end
+
+	local humanoid = char:FindFirstChild("Humanoid")
+	if not humanoid then return end
+
+	local anim = Instance.new("Animation")
+	anim.AnimationId = animId
+
+	local track = humanoid:LoadAnimation(anim)
+	track:Play()
+end
+
+local canAttack = true
+
+function attack()
+	if not canAttack then return end
+	canAttack = false
+
+	playAnim(punchAnimId)
+
+	attackEvent:FireServer()
+
+	task.wait(0.4)
+	canAttack = true
+end
+
+function kick()
+	if not canAttack then return end
+	canAttack = false
+
+	playAnim(kickAnimId)
+
+	attackEvent:FireServer()
+
+	task.wait(0.6)
+	canAttack = true
+end
+local player = game.Players.LocalPlayer
+local gui = script.Parent
+
+local function createButton(name, pos, callback)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(0,120,0,60)
+	btn.Position = pos
+	btn.Text = name
+	btn.BackgroundTransparency = 0.4
+	btn.BackgroundColor3 = Color3.fromRGB(0,0,0)
+	btn.TextColor3 = Color3.fromRGB(255,255,255)
+	btn.Parent = gui
+
+	btn.MouseButton1Click:Connect(callback)
+end
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local attackEvent = ReplicatedStorage:WaitForChild("AttackEvent")
+
+createButton("PUNCH", UDim2.new(0.2,0,0.8,0), function()
+	attackEvent:FireServer()
+end)
+
+createButton("KICK", UDim2.new(0.45,0,0.8,0), function()
+	attackEvent:FireServer()
+end)
+
+createButton("BLOCK", UDim2.new(0.7,0,0.8,0), function()
+	print("BLOCK (vamos conectar depois)")
+end)
