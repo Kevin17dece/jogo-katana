@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sword Duel Mobile</title>
+
+<style>
+body {
+    margin:0;
+    background:#000;
+    color:white;
+    font-family:Arial;
+    text-align:center;
+}
+
+canvas {
+    width:100%;
+    height:60vh;
+    background:#111;
+}
+
+.bar {
+    width:90%;
+    height:12px;
+    background:#222;
+    margin:5px auto;
+    border-radius:6px;
+    overflow:hidden;
+}
+
+.fill {
+    height:100%;
+}
+
+#player { background:#00ffcc; }
+#enemy { background:#ff4444; }
+
+#status {
+    font-size:18px;
+    margin:10px;
+}
+
+#btn {
+    width:80%;
+    padding:15px;
+    font-size:20px;
+    border:none;
+    border-radius:10px;
+    background:#00ffaa;
+    margin-top:10px;
+}
+</style>
+</head>
+
+<body>
+
+<div id="status">Prepare-se...</div>
+
+<div class="bar"><div id="enemy" class="fill"></div></div>
+<div class="bar"><div id="player" class="fill"></div></div>
+
+<canvas id="c"></canvas>
+
+<button id="btn">⚔️ ATACAR</button>
+
+<script>
+const canvas=document.getElementById("c");
+const ctx=canvas.getContext("2d");
+
+canvas.width=window.innerWidth;
+canvas.height=300;
+
+let state="wait";
+let stamina=100;
+let enemy=100;
+let timer=0;
+let difficulty=700;
+let combo=0;
+
+const status=document.getElementById("status");
+const pbar=document.getElementById("player");
+const ebar=document.getElementById("enemy");
+const btn=document.getElementById("btn");
+
+function vibrar(ms){
+    if(navigator.vibrate) navigator.vibrate(ms);
+}
+
+function draw(){
+    ctx.fillStyle="#111";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    // player
+    ctx.fillStyle="#00aaff";
+    ctx.fillRect(80,150,40,80);
+
+    // enemy
+    ctx.fillStyle="#ff4444";
+    ctx.fillRect(canvas.width-120,150,40,80);
+
+    if(state==="attack"){
+        ctx.fillStyle="yellow";
+        ctx.beginPath();
+        ctx.arc(canvas.width-100,150,20+Math.sin(Date.now()/40)10,0,Math.PI2);
+        ctx.fill();
+    }
+}
+
+function update(){
+    draw();
+
+    if(state==="wait" && Math.random()<0.02){
+        state="attack";
+        timer=Date.now();
+        status.innerText="⚠️ ATAQUE!";
+    }
+
+    if(state==="attack"){
+        if(Date.now()-timer>difficulty){
+            stamina-=20;
+            combo=0;
+            pbar.style.width=stamina+"%";
+            status.innerText="💥 VOCÊ FOI ATINGIDO!";
+            vibrar(200);
+            state="wait";
+
+            if(stamina<=0){
+                status.innerText="💀 DERROTA";
+                state="end";
+            }
+        }
+    }
+
+    requestAnimationFrame(update);
+}
+
+function atacar(){
+    if(state==="end") return;
+
+    if(state==="attack"){
+        let r=Date.now()-timer;
+
+        combo++;
+        let dmg=15+combo*2;
+        enemy-=dmg;
+        ebar.style.width=enemy+"%";
+
+        vibrar(50);
+
+        if(r<150){
+            status.innerText="⚡ PERFECT "+r+"ms x"+combo;
+        }else{
+            status.innerText="✔️ HIT "+r+"ms x"+combo;
+        }
+
+        difficulty-=20;
+
+        if(enemy<=0){
+            status.innerText="🏆 VITÓRIA!";
+            state="end";
+        }else{
+            state="wait";
+        }
+
+    }else{
+        stamina-=10;
+        combo=0;
+        pbar.style.width=stamina+"%";
+        status.innerText="❌ ERROU!";
+        vibrar(100);
+
+        if(stamina<=0){
+            status.innerText="💀 EXAUSTO";
+            state="end";
+        }
+    }
+}
+
+btn.addEventListener("click", atacar);
+window.addEventListener("keydown", e=>{
+    if(e.code==="Space") atacar();
+});
+
+update();
+</script>
+
+</body>
+</htm
