@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sword Duel INSANE 2.0</title>
+<title>Sword Duel Real</title>
 
 <style>
 body {
@@ -11,13 +11,11 @@ body {
     color:white;
     font-family:Arial;
     text-align:center;
-    overflow:hidden;
 }
 
 canvas {
     width:100%;
-    height:55vh;
-    background:linear-gradient(#020202,#111);
+    height:60vh;
 }
 
 .bar {
@@ -35,7 +33,6 @@ canvas {
 #enemy { background:#ff4444; }
 
 #status { margin:10px; font-size:18px; }
-#score { font-size:16px; }
 
 button {
     width:80%;
@@ -52,13 +49,12 @@ button {
 <body>
 
 <div id="menu">
-    <h2>⚔️ INSANE 2.0</h2>
+    <h2>⚔️ Sword Duel Real</h2>
     <button onclick="startGame()">▶️ START</button>
 </div>
 
 <div id="game" style="display:none;">
 <div id="status">Prepare-se...</div>
-<div id="score">Score: 0</div>
 
 <div class="bar"><div id="enemy" class="fill"></div></div>
 <div class="bar"><div id="player" class="fill"></div></div>
@@ -73,48 +69,74 @@ const c=document.getElementById("c");
 const ctx=c.getContext("2d");
 
 c.width=window.innerWidth;
-c.height=300;
+c.height=320;
 
 let state="wait";
 let stamina=100;
 let enemy=100;
 let timer=0;
 let difficulty=700;
-let combo=0;
-let score=0;
-let phase=1;
 let particles=[];
-let trails=[];
 
 const status=document.getElementById("status");
 const pbar=document.getElementById("player");
 const ebar=document.getElementById("enemy");
-const scoreUI=document.getElementById("score");
 
+// 🔊 som simples
 function sound(f){
  let a=new AudioContext();
  let o=a.createOscillator();
  o.frequency.value=f;
  o.connect(a.destination);
  o.start();
- setTimeout(()=>o.stop(),100);
+ setTimeout(()=>o.stop(),80);
 }
 
+// 🩸 partículas
 function spawn(x,y){
- for(let i=0;i<20;i++){
+ for(let i=0;i<15;i++){
   particles.push({
    x,y,
-   vx:(Math.random()-0.5)6,
-   vy:(Math.random()-0.5)6,
-   life:30
+   vx:(Math.random()-0.5)*5,
+   vy:(Math.random()-0.5)*5,
+   life:25
   });
  }
 }
 
-function trail(x,y){
- trails.push({x,y,life:10});
+// 🎨 desenhar personagem com espada
+function drawFighter(x,isEnemy){
+ ctx.fillStyle=isEnemy?"#ff4444":"#00aaff";
+
+ // corpo
+ ctx.fillRect(x-15,200,30,70);
+
+ // cabeça
+ ctx.fillStyle="#ffdbac";
+ ctx.fillRect(x-12,170,24,24);
+
+ // espada
+ ctx.strokeStyle="#ccc";
+ ctx.lineWidth=3;
+ ctx.beginPath();
+ ctx.moveTo(x+10,210);
+ ctx.lineTo(x+50,180);
+ ctx.stroke();
 }
 
+// 🌄 fundo
+function drawBackground(){
+ let g=ctx.createLinearGradient(0,0,0,320);
+ g.addColorStop(0,"#1a1a2e");
+ g.addColorStop(1,"#16213e");
+ ctx.fillStyle=g;
+ ctx.fillRect(0,0,c.width,320);
+
+ ctx.fillStyle="#0f3460";
+ ctx.fillRect(0,250,c.width,70);
+}
+
+// partículas
 function drawParticles(){
  particles.forEach(p=>{
   ctx.fillStyle="red";
@@ -126,38 +148,18 @@ function drawParticles(){
  particles=particles.filter(p=>p.life>0);
 }
 
-function drawTrail(){
- trails.forEach(t=>{
-  ctx.fillStyle="rgba(0,255,200,0.3)";
-  ctx.fillRect(t.x,t.y,5,5);
-  t.life--;
- });
- trails=trails.filter(t=>t.life>0);
-}
-
 function draw(){
- ctx.fillStyle="#050505";
- ctx.fillRect(0,0,c.width,c.height);
+ drawBackground();
 
- // background animado
- ctx.fillStyle="rgba(0,255,200,0.05)";
- ctx.fillRect(Math.sin(Date.now()/500)50+200,0,200,300);
-
- // player
- ctx.fillStyle="#00aaff";
- ctx.fillRect(80,150,40,80);
-
- // enemy
- ctx.fillStyle="#ff4444";
- ctx.fillRect(c.width-120,150,40,80);
+ drawFighter(80,false);
+ drawFighter(c.width-100,true);
 
  drawParticles();
- drawTrail();
 
  if(state==="attack"){
   ctx.fillStyle="yellow";
   ctx.beginPath();
-  ctx.arc(c.width-100,150,20+Math.sin(Date.now()/40)10,0,Math.PI2);
+  ctx.arc(c.width-100,180,20+Math.sin(Date.now()/40)10,0,Math.PI2);
   ctx.fill();
  }
 }
@@ -165,23 +167,22 @@ function draw(){
 function update(){
  draw();
 
- if(state==="wait" && Math.random()<0.02+phase0.005){
+ if(state==="wait" && Math.random()<0.02){
   state="attack";
   timer=Date.now();
-  status.innerText="⚠️ ATAQUE!";
+  status.innerText="⚠️ DEFENDA!";
  }
 
  if(state==="attack"){
   if(Date.now()-timer>difficulty){
    stamina-=20;
-   combo=0;
    pbar.style.width=stamina+"%";
-   status.innerText="💥 HIT!";
+   status.innerText="💥 VOCÊ FOI ATINGIDO!";
    sound(100);
    state="wait";
 
    if(stamina<=0){
-    status.innerText="💀 GAME OVER";
+    status.innerText="💀 DERROTA";
     state="end";
    }
   }
@@ -190,65 +191,55 @@ function update(){
  requestAnimationFrame(update);
 }
 
-function attack(){
+// ⚔️ ataque (GLOBAL pro iPhone)
+window.attack=function(){
  if(state==="end") return;
 
  if(state==="attack"){
   let r=Date.now()-timer;
 
-  combo++;
-  let dmg=15+combo4;
-  enemy-=dmg;
+  enemy-=20;
   ebar.style.width=enemy+"%";
 
-  spawn(c.width-100,150);
-  trail(c.width-100,150);
+  spawn(c.width-100,180);
+  sound(400);
 
-  sound(400+combo50);
-
-  if(r<130){
-   status.innerText="⚡ PERFECT "+r+"ms x"+combo;
+  if(r<150){
+   status.innerText="⚡ PERFECT "+r+"ms";
   }else{
-   status.innerText="✔️ HIT "+r+"ms x"+combo;
+   status.innerText="✔️ HIT "+r+"ms";
   }
-
-  score+=dmgcombo;
-  scoreUI.innerText="Score: "+score;
-
-  difficulty-=20;
 
   if(enemy<=0){
-   phase++;
-   enemy=100;
-   difficulty=700-phase100;
-   status.innerText="👹 FASE "+phase;
+   status.innerText="🏆 VITÓRIA!";
+   state="end";
+  }else{
+   state="wait";
   }
-
-  state="wait";
 
  }else{
   stamina-=10;
-  combo=0;
   pbar.style.width=stamina+"%";
   status.innerText="❌ ERROU!";
   sound(80);
 
   if(stamina<=0){
-   status.innerText="💀 GAME OVER";
+   status.innerText="💀 EXAUSTO";
    state="end";
   }
  }
 }
 
-function startGame(){
+// ▶️ start corrigido
+window.startGame=function(){
  document.getElementById("menu").style.display="none";
  document.getElementById("game").style.display="block";
 }
 
-window.onload = () => {
-    update();
-};
+// toque na tela inteira
+c.addEventListener("touchstart",()=>attack());
+
+update();
 </script>
 
 </body>
-</
