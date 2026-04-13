@@ -686,4 +686,58 @@ game.ReplicatedStorage.AttackEvent.OnClientEvent:Connect(function(combo)
 		playAnim("Punch3")
 	end
 end)
-					
+	function createCave(){
+  const material = new THREE.MeshStandardMaterial({
+    color: 0x1a1a1a,
+    roughness: 1
+  });
+
+  // chão
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(200, 200),
+    material
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = 0;
+  scene.add(ground);
+
+  // parede fundo
+  const backWall = new THREE.Mesh(
+    new THREE.PlaneGeometry(200, 80),
+    material
+  );
+  backWall.position.set(0, 40, -50);
+  scene.add(backWall);
+
+  // parede esquerda
+  const leftWall = new THREE.Mesh(
+    new THREE.PlaneGeometry(200, 80),
+    material
+  );
+  leftWall.rotation.y = Math.PI / 2;
+  leftWall.position.set(-50, 40, 0);
+  scene.add(leftWall);
+
+  // parede direita
+  const rightWall = leftWall.clone();
+  rightWall.position.set(50, 40, 0);
+  scene.add(rightWall);
+
+  // teto (opcional)
+  const ceiling = new THREE.Mesh(
+    new THREE.PlaneGeometry(200, 200),
+    material
+  );
+  ceiling.rotation.x = Math.PI / 2;
+  ceiling.position.y = 80;
+  scene.add(ceiling);
+}
+createCave();
+					const light = new THREE.PointLight(0xffaa55, 2, 200);
+light.position.set(0, 20, 10);
+scene.add(light);
+
+const ambient = new THREE.AmbientLight(0x111111);
+scene.add(ambient);
+
+		scene.fog = new THREE.Fog(0x000000, 20, 120);			
