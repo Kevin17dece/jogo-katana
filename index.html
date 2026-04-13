@@ -1,23 +1,15 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Shadow Fight Core Full</title>
-
+<meta charset="utf-8">
+<title>Shadow Fight Style Full Base</title>
 <style>
-body {
-  margin:0;
-  overflow:hidden;
-  background: radial-gradient(#222,#000);
-  font-family: Arial;
-}
-
+body { margin:0; overflow:hidden; background:black; }
 canvas { display:block; }
 
 #ui {
   position:absolute;
-  bottom:15px;
+  bottom:20px;
   width:100%;
   display:flex;
   justify-content:center;
@@ -25,719 +17,195 @@ canvas { display:block; }
 }
 
 button {
-  width:100px;
+  width:90px;
   height:50px;
-  border:none;
-  border-radius:10px;
-  background:#ffffff15;
+  background:#00000080;
   color:white;
-}
-
-#hp {
-  position:absolute;
-  top:10px;
-  width:100%;
-  display:flex;
-  justify-content:space-around;
-  color:white;
-  font-size:13px;
-}
-
-.bar {
-  width:140px;
-  height:10px;
-  background:#333;
-  border-radius:10px;
-  overflow:hidden;
-}
-
-.fill {
-  height:100%;
-  width:100%;
-  background:red;
+  border:1px solid white;
 }
 </style>
 </head>
-
 <body>
 
-<div id="hp">
-  <div>YOU <div class="bar"><div id="php" class="fill"></div></div></div>
-  <div>ENEMY <div class="bar"><div id="ehp" class="fill"></div></div></div>
-</div>
-
 <div id="ui">
-  <button onclick="attack('high')">HIGH</button>
-  <button onclick="attack('low')">LOW</button>
-  <button onclick="attack('special')">SPECIAL</button>
+  <button onclick="atk()">ATTACK</button>
+  <button onclick="kick()">KICK</button>
   <button onclick="block()">BLOCK</button>
+  <button onclick="dodge()">DODGE</button>
 </div>
 
-<canvas id="c"></canvas>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 
 <script>
-const c = document.getElementById("c");
-const ctx = c.getContext("2d");
+// ================= SCENE =================
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x000000, 20, 120);
 
-c.width = innerWidth;
-c.height = innerHeight;
+const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
+camera.position.set(0,15,30);
 
-let player = { x:200, y:450, hp:100, state:"idle", stun:0 };
-let enemy  = { x:650, y:450, hp:100, state:"idle", stun:0, cooldown:0 };
+const renderer = new THREE.WebGLRenderer();
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
 
+// ================= LIGHT =================
+const light = new THREE.PointLight(0xffaa55, 2, 200);
+light.position.set(0,20,10);
+scene.add(light);
+scene.add(new THREE.AmbientLight(0x111111));
+
+// ================= CAVE =================
+const mat = new THREE.MeshStandardMaterial({color:0x222222, roughness:1});
+
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(200,200), mat);
+floor.rotation.x = -Math.PI/2;
+scene.add(floor);
+
+function wall(x,z,rot){
+  const w = new THREE.Mesh(new THREE.PlaneGeometry(200,80), mat);
+  w.position.set(x,40,z);
+  w.rotation.y = rot;
+  scene.add(w);
+}
+
+wall(0,-50,0);
+wall(50,0,Math.PI/2);
+wall(-50,0,Math.PI/2);
+
+// ================= FIGHTERS =================
+function Fighter(x,color){
+  const g = new THREE.Group();
+
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(2,5,1),
+    new THREE.MeshBasicMaterial({color})
+  );
+
+  g.add(body);
+  g.position.x = x;
+  g.position.y = 3;
+
+  scene.add(g);
+
+  return g;
+}
+
+const player = Fighter(-5,0x000000);
+const enemy = Fighter(5,0x000000);
+
+// ================= STATE =================
+let combo = 0;
+let canAttack = true;
 let blocking = false;
-let shake = 0;
-let round = 1;
+let dodgeState = false;
 
-function drawFighter(x,y,color){
-  ctx.fillStyle = color;
+// ================= COMBAT =================
+function atk(){
+  if(!canAttack) return;
 
-  ctx.fillRect(x-15,y-80,30,90);   // corpo
-  ctx.fillRect(x-10,y-130,20,50);  // cabeça
-  ctx.fillRect(x-35,y-60,20,60);   // braço
-  ctx.fillRect(x+15,y-60,20,60);   // braço
-  ctx.fillRect(x-25,y+10,20,70);   // perna
-  ctx.fillRect(x+5,y+10,20,70);    // perna
+  canAttack = false;
+  combo++;
+
+  if(combo > 3) combo = 1;
+
+  attackHit(combo);
+
+  setTimeout(()=> canAttack = true, 400);
 }
 
-function dist(){
-  return Math.abs(player.x - enemy.x);
+function kick(){
+  attackHit(2);
 }
 
-// 🔥 ATAQUES
-function attack(type){
-  if(player.stun > 0) return;
-
-  let range = 0;
-  let dmg = 0;
-  let force = 0;
-
-  if(type === "high"){ range = 220; dmg = 8; force = 25; }
-  if(type === "low"){ range = 200; dmg = 6; force = 20; }
-  if(type === "special"){ range = 250; dmg = 15; force = 45; }
-
-  player.state = "attack";
-
-  if(dist() < range){
-    if(enemy.state === "block"){
-      enemy.hp -= dmg * 0.3;
-    } else {
-      enemy.hp -= dmg;
-      enemy.x += force;
-      enemy.stun = 10;
-      shake = 8;
-    }
-
-    updateHP();
-  }
-}
-
-// 🛡️ BLOCK / PARRY
 function block(){
   blocking = true;
-  player.state = "block";
-
-  setTimeout(()=>{
-    blocking = false;
-    player.state = "idle";
-  },400);
+  setTimeout(()=> blocking=false, 400);
 }
 
-// 🧠 IA MELHORADA
+function dodge(){
+  dodgeState = true;
+  player.position.x += 3;
+  setTimeout(()=> dodgeState=false, 200);
+}
+
+// ================= HIT SYSTEM =================
+function attackHit(type){
+
+  let dist = Math.abs(player.position.x - enemy.position.x);
+
+  if(dist < 6){
+
+    let dmg = type === 1 ? 5 : type === 2 ? 10 : 15;
+
+    if(enemy.blocking){
+      dmg *= 0.3;
+    }
+
+    enemy.health = (enemy.health || 100) - dmg;
+
+    enemy.position.x += 2;
+
+    shake();
+  }
+}
+
+// ================= IA =================
 function enemyAI(){
 
-  if(enemy.stun > 0){
-    enemy.stun--;
-    return;
-  }
+  let dist = Math.abs(player.position.x - enemy.position.x);
 
-  let d = dist();
-
-  if(enemy.cooldown > 0){
-    enemy.cooldown--;
-    return;
-  }
-
-  if(d > 180){
-    enemy.x -= 2;
-    enemy.state = "move";
+  if(dist > 6){
+    enemy.position.x -= 0.05;
   } else {
-    enemy.state = "attack";
-
-    enemy.cooldown = 50;
-
-    let attackType = Math.random();
-
-    if(attackType < 0.5){
-      hitPlayer(8);
-    } else {
-      hitPlayer(12);
+    if(Math.random() < 0.02){
+      enemyAttack();
     }
   }
 }
 
-function hitPlayer(dmg){
-  if(blocking){
-    player.hp -= dmg * 0.2;
-  } else {
-    player.hp -= dmg;
-    player.x -= 35;
-    player.stun = 10;
-    shake = 10;
-  }
+function enemyAttack(){
 
-  updateHP();
-}
+  let dist = Math.abs(player.position.x - enemy.position.x);
 
-// 💀 HP
-function updateHP(){
-  document.getElementById("php").style.width = player.hp + "%";
-  document.getElementById("ehp").style.width = enemy.hp + "%";
+  if(dist < 6){
 
-  if(player.hp <= 0){
-    alert("YOU LOST ROUND " + round);
-    reset();
-  }
-
-  if(enemy.hp <= 0){
-    alert("YOU WON ROUND " + round);
-    round++;
-    reset();
+    if(blocking){
+      // parry
+      enemy.position.x += 2;
+    } else {
+      player.position.x -= 2;
+      shake();
+    }
   }
 }
 
-// 🔄 RESET ROUND
-function reset(){
-  player.hp = 100;
-  enemy.hp = 100;
-  player.x = 200;
-  enemy.x = 650;
+// ================= CAMERA SHAKE =================
+let shakePower = 0;
+
+function shake(){
+  shakePower = 0.5;
 }
 
-// 🎥 ANIMAÇÃO
-function update(){
-  if(player.stun > 0) player.stun--;
-  if(enemy.stun > 0) enemy.stun--;
-
-  if(player.state === "attack"){
-    player.x += 3;
-  }
-
-  if(player.state === "block"){
-    player.x += 0.2;
-  }
-
-  if(enemy.state === "attack"){
-    enemy.x -= 2;
-  }
-}
-
-// 🎬 LOOP
-function loop(){
-  requestAnimationFrame(loop);
-
-  ctx.clearRect(0,0,c.width,c.height);
-
-  if(shake > 0){
-    ctx.save();
-    ctx.translate(Math.random()*6,Math.random()*6);
-    shake--;
-  }
+// ================= LOOP =================
+function animate(){
+  requestAnimationFrame(animate);
 
   enemyAI();
-  update();
 
-  drawFighter(player.x,player.y,"black");
-  drawFighter(enemy.x,enemy.y,"black");
+  camera.position.x = player.position.x;
+  camera.lookAt(player.position.x,2,0);
 
-  if(shake > 0) ctx.restore();
+  if(shakePower > 0){
+    camera.position.y += (Math.random()-0.5)*shakePower;
+    camera.position.x += (Math.random()-0.5)*shakePower;
+    shakePower *= 0.9;
+  }
+
+  renderer.render(scene,camera);
 }
 
-loop();
+animate();
 </script>
 
 </body>
 </html>
-local player = game.Players.LocalPlayer
-local camera = workspace.CurrentCamera
-
-camera.CameraType = Enum.CameraType.Scriptable
-
-local runService = game:GetService("RunService")
-
-runService.RenderStepped:Connect(function()
-	local char = player.Character
-	if not char then return end
-
-	local root = char:FindFirstChild("HumanoidRootPart")
-	if not root then return end
-
-	local targetPos = root.Position + Vector3.new(0, 3, 8)
-
-	camera.CFrame = CFrame.new(targetPos, root.Position + Vector3.new(0,2,0))
-end)
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local attackEvent = ReplicatedStorage:WaitForChild("AttackEvent")
-
-local player = game.Players.LocalPlayer
-
--- ⚠️ coloque seus IDs depois
-local punchAnimId = "rbxassetid://0"
-local kickAnimId = "rbxassetid://0"
-
-local function playAnim(animId)
-	local char = player.Character
-	if not char then return end
-
-	local humanoid = char:FindFirstChild("Humanoid")
-	if not humanoid then return end
-
-	local anim = Instance.new("Animation")
-	anim.AnimationId = animId
-
-	local track = humanoid:LoadAnimation(anim)
-	track:Play()
-end
-
-local canAttack = true
-
-function attack()
-	if not canAttack then return end
-	canAttack = false
-
-	playAnim(punchAnimId)
-
-	attackEvent:FireServer()
-
-	task.wait(0.4)
-	canAttack = true
-end
-
-function kick()
-	if not canAttack then return end
-	canAttack = false
-
-	playAnim(kickAnimId)
-
-	attackEvent:FireServer()
-
-	task.wait(0.6)
-	canAttack = true
-end
-local player = game.Players.LocalPlayer
-local gui = script.Parent
-
-local function createButton(name, pos, callback)
-	local btn = Instance.new("TextButton")
-	btn.Size = UDim2.new(0,120,0,60)
-	btn.Position = pos
-	btn.Text = name
-	btn.BackgroundTransparency = 0.4
-	btn.BackgroundColor3 = Color3.fromRGB(0,0,0)
-	btn.TextColor3 = Color3.fromRGB(255,255,255)
-	btn.Parent = gui
-
-	btn.MouseButton1Click:Connect(callback)
-end
-
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local attackEvent = ReplicatedStorage:WaitForChild("AttackEvent")
-
-createButton("PUNCH", UDim2.new(0.2,0,0.8,0), function()
-	attackEvent:FireServer()
-end)
-
-createButton("KICK", UDim2.new(0.45,0,0.8,0), function()
-	attackEvent:FireServer()
-end)
-
-createButton("BLOCK", UDim2.new(0.7,0,0.8,0), function()
-local ANIMS = {
-	Punch = "rbxassetid://0",
-	Kick = "rbxassetid://0",
-	Block = "rbxassetid://0",
-	Dodge = "rbxassetid://0"
-}
-	print("BLOCK (vamos conectar depois)")
-end)
-Ia inimiga lutando com animação, efeitos aaa e sistema de esquiva e parry 
-local UIS = game:GetService("UserInputService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local attackEvent = ReplicatedStorage:WaitForChild("AttackEvent")
-local blockEvent = ReplicatedStorage:WaitForChild("BlockEvent")
-local dodgeEvent = ReplicatedStorage:WaitForChild("DodgeEvent")
-
-local canAttack = true
-local blocking = false
-
--- ATTACK
-local function attack()
-	if not canAttack then return end
-	canAttack = false
-
-	attackEvent:FireServer()
-
-	task.wait(0.4)
-	canAttack = true
-end
-
--- BLOCK (PARRY SYSTEM)
-local function blockStart()
-	blocking = true
-	blockEvent:FireServer(true)
-end
-
-local function blockEnd()
-	blocking = false
-	blockEvent:FireServer(false)
-end
-
--- DODGE
-local function dodge()
-	dodgeEvent:FireServer()
-end
-
-UIS.InputBegan:Connect(function(input, gpe)
-	if gpe then return end
-
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		attack()
-	end
-
-	if input.KeyCode == Enum.KeyCode.F then
-		blockStart()
-	end
-
-	if input.KeyCode == Enum.KeyCode.Space then
-		dodge()
-	end
-end)
-
-UIS.InputEnded:Connect(function(input)
-	if input.KeyCode == Enum.KeyCode.F then
-		blockEnd()
-	end
-end)
-local Players = game:GetService("Players")
-
-local function getClosestEnemy(char)
-	local root = char:FindFirstChild("HumanoidRootPart")
-	if not root then return end
-
-	local closest, dist = nil, 999
-
-	for _, p in pairs(Players:GetPlayers()) do
-		if p.Character and p.Character ~= char then
-			local r = p.Character:FindFirstChild("HumanoidRootPart")
-			if r then
-				local d = (root.Position - r.Position).Magnitude
-				if d < dist then
-					dist = d
-					closest = p.Character
-				end
-			end
-		end
-	end
-
-	return closest, dist
-end
-
-while task.wait(0.2) do
-	for _, enemyChar in pairs(workspace:GetChildren()) do
-		if enemyChar:FindFirstChild("Humanoid") and enemyChar:FindFirstChild("AI") then
-
-			local target, dist = getClosestEnemy(enemyChar)
-			if not target then continue end
-
-			local eRoot = enemyChar.HumanoidRootPart
-			local tRoot = target.HumanoidRootPart
-			local hum = enemyChar.Humanoid
-
-			-- mover até o player
-			if dist > 5 then
-				hum:MoveTo(tRoot.Position)
-			else
-				-- atacar
-				if math.random() < 0.4 then
-					enemyChar:SetAttribute("Attacking", true)
-
-					local targetHum = target:FindFirstChild("Humanoid")
-
-					if targetHum then
-						targetHum:TakeDamage(8)
-					end
-
-					task.wait(0.5)
-					enemyChar:SetAttribute("Attacking", false)
-				end
-			end
-		end
-	end
-end
-					local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local attackEvent = ReplicatedStorage:WaitForChild("AttackEvent")
-local blockEvent = ReplicatedStorage:WaitForChild("BlockEvent")
-local dodgeEvent = ReplicatedStorage:WaitForChild("DodgeEvent")
-
-local blocking = {}
-local dodging = {}
-
--- BLOCK
-blockEvent.OnServerEvent:Connect(function(player, state)
-	blocking[player] = state
-end)
-
--- DODGE (invencibilidade curta)
-dodgeEvent.OnServerEvent:Connect(function(player)
-	dodging[player] = true
-
-	task.delay(0.3, function()
-		dodging[player] = false
-	end)
-end)
-
--- ATTACK
-attackEvent.OnServerEvent:Connect(function(player)
-
-	local char = player.Character
-	if not char then return end
-
-	local root = char:FindFirstChild("HumanoidRootPart")
-	if not root then return end
-
-	for _, target in pairs(game.Players:GetPlayers()) do
-
-		if target ~= player and target.Character then
-
-			local tChar = target.Character
-			local tRoot = tChar:FindFirstChild("HumanoidRootPart")
-			local hum = tChar:FindFirstChild("Humanoid")
-
-			if tRoot and hum then
-
-				local dist = (root.Position - tRoot.Position).Magnitude
-
-				if dist < 5 then
-
-					-- 🧠 DODGE = invencível
-					if dodging[target] then
-						return
-					end
-
-					-- 🛡 PARry SYSTEM
-					if blocking[target] then
-						-- PARRY: reduz dano e empurra atacante
-						hum:TakeDamage(2)
-
-						root.Velocity = (root.Position - tRoot.Position).Unit * 30
-
-					else
-						hum:TakeDamage(10)
-
-						tRoot.Velocity = (tRoot.Position - root.Position).Unit * 40
-					end
-				end
-			end
-		end
-	end
-end)
-					
-local Lighting = game:GetService("Lighting")
-
-game.ReplicatedStorage.AttackEvent.OnClientEvent:Connect(function()
-
-	-- flash hit
-	Lighting.Brightness = 5
-	task.wait(0.05)
-	
-					Lighting.Brightness = 2
-local Animations = {
-	Punch1 = "rbxassetid://0",
-	Punch2 = "rbxassetid://0",
-	Punch3 = "rbxassetid://0"
-}
-					
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local UIS = game:GetService("UserInputService")
-
-local attackEvent = ReplicatedStorage:WaitForChild("AttackEvent")
-
-local combo = 0
-local lastClick = 0
-local canAttack = true
-
-local COMBO_RESET_TIME = 0.9
-
-function attack()
-
-	if not canAttack then return end
-
-	local now = tick()
-
-	-- reset combo se demorar muito
-	if now - lastClick > COMBO_RESET_TIME then
-		combo = 0
-	end
-
-	lastClick = now
-	combo += 1
-
-	if combo > 3 then
-		combo = 1
-	end
-
-	canAttack = false
-
-	attackEvent:FireServer(combo)
-
-	task.wait(0.35)
-
-	canAttack = true
-end
-
-UIS.InputBegan:Connect(function(input, gpe)
-	if gpe then return end
-
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		attack()
-	end
-end)
-					
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local attackEvent = ReplicatedStorage:WaitForChild("AttackEvent")
-
-local DAMAGE = {
-	[1] = 6,
-	[2] = 9,
-	[3] = 15
-}
-
-local RANGE = 5
-
-attackEvent.OnServerEvent:Connect(function(player, combo)
-
-	local char = player.Character
-	if not char then return end
-
-	local root = char:FindFirstChild("HumanoidRootPart")
-	if not root then return end
-
-	for _, p in pairs(game.Players:GetPlayers()) do
-
-		if p ~= player and p.Character then
-
-			local target = p.Character
-			local tRoot = target:FindFirstChild("HumanoidRootPart")
-			local hum = target:FindFirstChild("Humanoid")
-
-			if tRoot and hum then
-
-				local dist = (root.Position - tRoot.Position).Magnitude
-
-				if dist < RANGE then
-
-					local dmg = DAMAGE[combo] or 6
-
-					hum:TakeDamage(dmg)
-
-					-- knockback progressivo por combo
-					local force = 25 + (combo * 10)
-
-					tRoot.Velocity =
-						(tRoot.Position - root.Position).Unit * force + Vector3.new(0,8,0)
-				end
-			end
-		end
-	end
-end)
-							
-local player = game.Players.LocalPlayer
-
-local Animations = {
-	Punch1 = "rbxassetid://0",
-	Punch2 = "rbxassetid://0",
-	Punch3 = "rbxassetid://0"
-}
-
-local function playAnim(name)
-	local char = player.Character
-	if not char then return end
-
-	local hum = char:FindFirstChild("Humanoid")
-	if not hum then return end
-
-	local anim = Instance.new("Animation")
-	anim.AnimationId = Animations[name]
-
-	local track = hum:LoadAnimation(anim)
-	track:Play()
-
-	return track
-end
-
-game.ReplicatedStorage.AttackEvent.OnClientEvent:Connect(function(combo)
-	if combo == 1 then
-		playAnim("Punch1")
-	elseif combo == 2 then
-		playAnim("Punch2")
-	elseif combo == 3 then
-		playAnim("Punch3")
-	end
-end)
-	function createCave(){
-  const material = new THREE.MeshStandardMaterial({
-    color: 0x1a1a1a,
-    roughness: 1
-  });
-
-  // chão
-  const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(200, 200),
-    material
-  );
-  ground.rotation.x = -Math.PI / 2;
-  ground.position.y = 0;
-  scene.add(ground);
-
-  // parede fundo
-  const backWall = new THREE.Mesh(
-    new THREE.PlaneGeometry(200, 80),
-    material
-  );
-  backWall.position.set(0, 40, -50);
-  scene.add(backWall);
-
-  // parede esquerda
-  const leftWall = new THREE.Mesh(
-    new THREE.PlaneGeometry(200, 80),
-    material
-  );
-  leftWall.rotation.y = Math.PI / 2;
-  leftWall.position.set(-50, 40, 0);
-  scene.add(leftWall);
-
-  // parede direita
-  const rightWall = leftWall.clone();
-  rightWall.position.set(50, 40, 0);
-  scene.add(rightWall);
-
-  // teto (opcional)
-  const ceiling = new THREE.Mesh(
-    new THREE.PlaneGeometry(200, 200),
-    material
-  );
-  ceiling.rotation.x = Math.PI / 2;
-  ceiling.position.y = 80;
-  scene.add(ceiling);
-}
-createCave();
-					const light = new THREE.PointLight(0xffaa55, 2, 200);
-light.position.set(0, 20, 10);
-scene.add(light);
-
-const ambient = new THREE.AmbientLight(0x111111);
-scene.add(ambient);
-
-		scene.fog = new THREE.Fog(0x000000, 20, 120);			
