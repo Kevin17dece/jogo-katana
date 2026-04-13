@@ -1,208 +1,166 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-br">
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AAA Sword Game FIX</title>
+<meta charset="UTF-8">
+<title>AAA 3D World Base</title>
 
 <style>
-body { margin:0; background:#000; overflow:hidden; }
-canvas { width:100%; height:70vh; touch-action:none; display:block; }
+body { margin:0; overflow:hidden; background:#000; }
+canvas { display:block; }
 </style>
 </head>
 
 <body>
 
-<canvas id="c"></canvas>
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
 
 <script>
-const c = document.getElementById("c");
-const ctx = c.getContext("2d");
+// ============================
+// SETUP BÁSICO 3D
+// ============================
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x87ceeb, 20, 120);
 
-c.width = window.innerWidth;
-c.height = 400;
+const camera = new THREE.PerspectiveCamera(
+  75,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1000
+);
 
-// =====================
-// CAMERA
-// =====================
-let camera = 0;
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
 
-// =====================
-// PLAYER
-// =====================
-let player = {
- x: 100,
- y: 260,
- combo: 0,
- attackTimer: 0
-};
+// ============================
+// LUZ
+// ============================
+const light = new THREE.DirectionalLight(0xffffff, 1.2);
+light.position.set(10,20,10);
+scene.add(light);
 
-// =====================
+const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+scene.add(ambient);
+
+// ============================
+// MUNDO ABERTO (TERRENO)
+// ============================
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(500, 500),
+  new THREE.MeshStandardMaterial({ color: 0x228B22 })
+);
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+
+// ============================
+// PLAYER (PLACEHOLDER 3D)
+// ============================
+const player = new THREE.Mesh(
+  new THREE.BoxGeometry(1,2,1),
+  new THREE.MeshStandardMaterial({ color: 0x00aaff })
+);
+player.position.y = 1;
+scene.add(player);
+
+// ============================
 // ENEMY
-// =====================
-let enemy = {
- x: 600,
- y: 260,
- hp: 100,
- maxHp: 100
-};
+// ============================
+const enemy = new THREE.Mesh(
+  new THREE.BoxGeometry(1,2,1),
+  new THREE.MeshStandardMaterial({ color: 0xff3333 })
+);
+enemy.position.set(5,1,5);
+scene.add(enemy);
 
-// =====================
-// PARTICLES
-// =====================
-let particles = [];
-let dir = 0;
+// ============================
+// CONTROLES
+// ============================
+const keys = {};
+document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
+document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
 
-// =====================
-// TOUCH CONTROLS
-// =====================
-document.addEventListener("touchmove", (e) => {
- let x = e.touches[0].clientX;
- dir = x < c.width / 2 ? -1 : 1;
+// ============================
+// CÂMERA 360 (DRAG)
+// ============================
+let isDragging = false;
+let rotY = 0;
+let rotX = 0;
+
+document.addEventListener("mousedown", ()=>isDragging=true);
+document.addEventListener("mouseup", ()=>isDragging=false);
+
+document.addEventListener("mousemove", (e)=>{
+ if(isDragging){
+  rotY -= e.movementX * 0.005;
+  rotX -= e.movementY * 0.005;
+  rotX = Math.max(-1.2, Math.min(1.2, rotX));
+ }
 });
 
-document.addEventListener("touchend", () => dir = 0);
+// mobile touch
+let lastX=0, lastY=0;
 
-c.addEventListener("touchstart", () => {
- player.attackTimer = 15;
- player.combo++;
- if (player.combo > 3) player.combo = 1;
+document.addEventListener("touchmove",(e)=>{
+ let t = e.touches[0];
+ if(lastX){
+  rotY -= (t.clientX - lastX)*0.005;
+  rotX -= (t.clientY - lastY)*0.005;
+  rotX = Math.max(-1.2, Math.min(1.2, rotX));
+ }
+ lastX = t.clientX;
+ lastY = t.clientY;
 });
 
-// =====================
-// PARTICLE FX
-// =====================
-function spawn(x, y) {
- for (let i = 0; i < 20; i++) {
-  particles.push({
-   x,
-   y,
-   vx: (Math.random() - 0.5) * 6,
-   vy: (Math.random() - 0.5) * 6,
-   life: 25
-  });
- }
-}
-
-// =====================
-// BACKGROUND
-// =====================
-function drawBg() {
- let g = ctx.createLinearGradient(0, 0, 0, 400);
- g.addColorStop(0, "#1a1a2e");
- g.addColorStop(1, "#16213e");
-
- ctx.fillStyle = g;
- ctx.fillRect(0, 0, c.width, 400);
-
- ctx.fillStyle = "#0f3460";
- ctx.fillRect(0, 320, c.width, 80);
-}
-
-// =====================
-// PLAYER
-// =====================
-function drawPlayer() {
- ctx.fillStyle = "#00aaff";
- ctx.fillRect(player.x - camera, player.y, 30, 60);
-
- ctx.strokeStyle = "#fff";
- ctx.lineWidth = 3;
-
- let a = player.attackTimer > 0 ? Math.sin(player.attackTimer) * 2 : -0.5;
-
- ctx.beginPath();
- ctx.moveTo(player.x - camera + 15, player.y + 20);
- ctx.lineTo(
-  player.x - camera + 60 * Math.cos(a),
-  player.y + 20 + 60 * Math.sin(a)
- );
- ctx.stroke();
-}
-
-// =====================
-// ENEMY
-// =====================
-function drawEnemy() {
- ctx.fillStyle = "#ff4444";
- ctx.fillRect(enemy.x - camera, enemy.y, 30, 60);
-
- ctx.fillStyle = "red";
- ctx.fillRect(enemy.x - camera, enemy.y - 10, 30 * (enemy.hp / enemy.maxHp), 5);
-}
-
-// =====================
-// PARTICLES
-// =====================
-function drawParticles() {
- particles.forEach(p => {
-  ctx.fillStyle = "red";
-  ctx.fillRect(p.x - camera, p.y, 3, 3);
-
-  p.x += p.vx;
-  p.y += p.vy;
-  p.life--;
- });
-
- particles = particles.filter(p => p.life > 0);
-}
-
-// =====================
-// ENEMY AI
-// =====================
-function enemyAI() {
- let dist = player.x - enemy.x;
-
- if (Math.abs(dist) > 50) {
-  enemy.x += dist * 0.02;
- } else {
-  if (Math.random() < 0.02) {
-   spawn(player.x, player.y);
-  }
- }
-}
-
-// =====================
-// HIT SYSTEM
-// =====================
-function hit() {
- if (player.attackTimer > 0 && Math.abs(player.x - enemy.x) < 70) {
-  enemy.hp -= 2 * player.combo;
-  spawn(enemy.x, enemy.y);
- }
-}
-
-// =====================
+// ============================
 // LOOP
-// =====================
-function update() {
- ctx.clearRect(0, 0, c.width, c.height);
+// ============================
+function animate(){
+ requestAnimationFrame(animate);
 
- drawBg();
+ // movimento relativo à câmera
+ let speed = 0.15;
 
- player.x += dir * 4;
+ let forward = new THREE.Vector3(
+  Math.sin(rotY),
+  0,
+  Math.cos(rotY)
+ );
 
- if (player.x < 0) player.x = 0;
+ let right = new THREE.Vector3(
+  Math.cos(rotY),
+  0,
+  -Math.sin(rotY)
+ );
 
- camera = player.x - c.width / 2;
+ if(keys["w"]) player.position.addScaledVector(forward, speed);
+ if(keys["s"]) player.position.addScaledVector(forward, -speed);
+ if(keys["a"]) player.position.addScaledVector(right, -speed);
+ if(keys["d"]) player.position.addScaledVector(right, speed);
 
- if (player.attackTimer > 0) player.attackTimer--;
+ // câmera 3ª pessoa livre
+ let camOffset = new THREE.Vector3(
+  Math.sin(rotY)*5,
+  3 + rotX*2,
+  Math.cos(rotY)*5
+ );
 
- enemyAI();
- hit();
+ camera.position.copy(player.position).add(camOffset);
+ camera.lookAt(player.position);
 
- drawPlayer();
- drawEnemy();
- drawParticles();
+ // inimigo simples
+ enemy.position.x += Math.sin(Date.now()*0.001)*0.01;
 
- if (enemy.hp <= 0) {
-  enemy.hp = enemy.maxHp;
-  enemy.x = player.x + 300;
- }
-
- requestAnimationFrame(update);
+ renderer.render(scene,camera);
 }
 
-update();
+animate();
+
+// resize
+window.addEventListener("resize",()=>{
+ camera.aspect = window.innerWidth/window.innerHeight;
+ camera.updateProjectionMatrix();
+ renderer.setSize(window.innerWidth,window.innerHeight);
+});
 </script>
 
 </body>
