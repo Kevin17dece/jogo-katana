@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Shadow Fight Style Core Game</title>
+<title>Shadow Fight Core Full</title>
 
 <style>
 body {
@@ -17,21 +17,20 @@ canvas { display:block; }
 
 #ui {
   position:absolute;
-  bottom:20px;
+  bottom:15px;
   width:100%;
   display:flex;
   justify-content:center;
-  gap:12px;
+  gap:10px;
 }
 
 button {
-  width:110px;
-  height:55px;
+  width:100px;
+  height:50px;
   border:none;
-  border-radius:12px;
+  border-radius:10px;
   background:#ffffff15;
   color:white;
-  font-size:14px;
 }
 
 #hp {
@@ -41,7 +40,7 @@ button {
   display:flex;
   justify-content:space-around;
   color:white;
-  font-size:14px;
+  font-size:13px;
 }
 
 .bar {
@@ -68,8 +67,9 @@ button {
 </div>
 
 <div id="ui">
-  <button onclick="attack()">ATTACK</button>
-  <button onclick="kick()">KICK</button>
+  <button onclick="attack('high')">HIGH</button>
+  <button onclick="attack('low')">LOW</button>
+  <button onclick="attack('special')">SPECIAL</button>
   <button onclick="block()">BLOCK</button>
 </div>
 
@@ -82,75 +82,49 @@ const ctx = c.getContext("2d");
 c.width = innerWidth;
 c.height = innerHeight;
 
-let player = {
-  x: 200,
-  y: 450,
-  hp: 100,
-  state: "idle",
-  atkFrame: 0,
-  weapon: false
-};
-
-let enemy = {
-  x: 600,
-  y: 450,
-  hp: 100,
-  state: "idle",
-  atkFrame: 0,
-  cooldown: 0
-};
+let player = { x:200, y:450, hp:100, state:"idle", stun:0 };
+let enemy  = { x:650, y:450, hp:100, state:"idle", stun:0, cooldown:0 };
 
 let blocking = false;
 let shake = 0;
-let combo = 0;
-let lastHit = 0;
+let round = 1;
 
-function drawShadow(x,y,scale=1){
-  ctx.fillStyle="black";
+function drawFighter(x,y,color){
+  ctx.fillStyle = color;
 
-  // sombra chão
-  ctx.beginPath();
-  ctx.ellipse(x,y+80,40*scale,10*scale,0,0,Math.PI*2);
-  ctx.fill();
-
-  // corpo
-  ctx.fillRect(x-15,y-80,30,90);
-
-  // cabeça
-  ctx.fillRect(x-10,y-130,20,50);
-
-  // braços
-  ctx.fillRect(x-35,y-60,20,60);
-  ctx.fillRect(x+15,y-60,20,60);
-
-  // pernas
-  ctx.fillRect(x-25,y+10,20,70);
-  ctx.fillRect(x+5,y+10,20,70);
+  ctx.fillRect(x-15,y-80,30,90);   // corpo
+  ctx.fillRect(x-10,y-130,20,50);  // cabeça
+  ctx.fillRect(x-35,y-60,20,60);   // braço
+  ctx.fillRect(x+15,y-60,20,60);   // braço
+  ctx.fillRect(x-25,y+10,20,70);   // perna
+  ctx.fillRect(x+5,y+10,20,70);    // perna
 }
 
-function distance(){
+function dist(){
   return Math.abs(player.x - enemy.x);
 }
 
-function attack(){
-  let now = Date.now();
+// 🔥 ATAQUES
+function attack(type){
+  if(player.stun > 0) return;
 
-  if(now - lastHit < 400) combo++;
-  else combo = 1;
+  let range = 0;
+  let dmg = 0;
+  let force = 0;
 
-  lastHit = now;
+  if(type === "high"){ range = 220; dmg = 8; force = 25; }
+  if(type === "low"){ range = 200; dmg = 6; force = 20; }
+  if(type === "special"){ range = 250; dmg = 15; force = 45; }
 
   player.state = "attack";
-  player.atkFrame = 10;
 
-  if(distance() < 220){
-    let dmg = 8 + combo * 2;
-
+  if(dist() < range){
     if(enemy.state === "block"){
       enemy.hp -= dmg * 0.3;
     } else {
       enemy.hp -= dmg;
-      enemy.x += 25;
+      enemy.x += force;
+      enemy.stun = 10;
       shake = 8;
     }
 
@@ -158,18 +132,7 @@ function attack(){
   }
 }
 
-function kick(){
-  player.state = "kick";
-  player.atkFrame = 12;
-
-  if(distance() < 240){
-    enemy.hp -= 12;
-    enemy.x += 40;
-    shake = 10;
-    updateHP();
-  }
-}
-
+// 🛡️ BLOCK / PARRY
 function block(){
   blocking = true;
   player.state = "block";
@@ -177,67 +140,99 @@ function block(){
   setTimeout(()=>{
     blocking = false;
     player.state = "idle";
-  },500);
+  },400);
 }
 
+// 🧠 IA MELHORADA
 function enemyAI(){
+
+  if(enemy.stun > 0){
+    enemy.stun--;
+    return;
+  }
+
+  let d = dist();
+
   if(enemy.cooldown > 0){
     enemy.cooldown--;
     return;
   }
 
-  let dist = distance();
-
-  if(dist > 180){
-    enemy.x -= 1.8;
-    enemy.state = "walk";
+  if(d > 180){
+    enemy.x -= 2;
+    enemy.state = "move";
   } else {
     enemy.state = "attack";
 
-    if(Math.random() < 0.03){
-      enemy.cooldown = 60;
+    enemy.cooldown = 50;
 
-      if(blocking){
-        player.hp -= 2;
-      } else {
-        player.hp -= 10;
-        player.x -= 30;
-        shake = 6;
-      }
+    let attackType = Math.random();
 
-      updateHP();
+    if(attackType < 0.5){
+      hitPlayer(8);
+    } else {
+      hitPlayer(12);
     }
   }
 }
 
+function hitPlayer(dmg){
+  if(blocking){
+    player.hp -= dmg * 0.2;
+  } else {
+    player.hp -= dmg;
+    player.x -= 35;
+    player.stun = 10;
+    shake = 10;
+  }
+
+  updateHP();
+}
+
+// 💀 HP
 function updateHP(){
   document.getElementById("php").style.width = player.hp + "%";
   document.getElementById("ehp").style.width = enemy.hp + "%";
 
-  if(player.hp <= 0) alert("YOU LOSE");
-  if(enemy.hp <= 0) alert("YOU WIN");
+  if(player.hp <= 0){
+    alert("YOU LOST ROUND " + round);
+    reset();
+  }
+
+  if(enemy.hp <= 0){
+    alert("YOU WON ROUND " + round);
+    round++;
+    reset();
+  }
 }
 
-function updateAnimations(){
-  if(player.atkFrame > 0){
-    player.atkFrame--;
-  }
+// 🔄 RESET ROUND
+function reset(){
+  player.hp = 100;
+  enemy.hp = 100;
+  player.x = 200;
+  enemy.x = 650;
+}
+
+// 🎥 ANIMAÇÃO
+function update(){
+  if(player.stun > 0) player.stun--;
+  if(enemy.stun > 0) enemy.stun--;
 
   if(player.state === "attack"){
-    player.x += 2;
-    if(player.atkFrame === 0) player.state = "idle";
+    player.x += 3;
   }
 
-  if(player.state === "kick"){
-    player.x += 3;
-    if(player.atkFrame === 0) player.state = "idle";
+  if(player.state === "block"){
+    player.x += 0.2;
   }
 
   if(enemy.state === "attack"){
-    enemy.x -= 0.5;
+    enemy.x -= 2;
   }
 }
 
+// 🎬 LOOP
 function loop(){
   requestAnimationFrame(loop);
 
@@ -245,15 +240,15 @@ function loop(){
 
   if(shake > 0){
     ctx.save();
-    ctx.translate(Math.random()*6, Math.random()*6);
+    ctx.translate(Math.random()*6,Math.random()*6);
     shake--;
   }
 
   enemyAI();
-  updateAnimations();
+  update();
 
-  drawShadow(player.x,player.y,1);
-  drawShadow(enemy.x,enemy.y,1);
+  drawFighter(player.x,player.y,"black");
+  drawFighter(enemy.x,enemy.y,"black");
 
   if(shake > 0) ctx.restore();
 }
